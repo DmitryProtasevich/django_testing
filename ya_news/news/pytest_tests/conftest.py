@@ -1,12 +1,46 @@
-
 from datetime import datetime, timedelta
 
 import pytest
 from django.test.client import Client
+from django.urls import reverse
 from django.utils import timezone
-from news.forms import BAD_WORDS
 from news.models import Comment, News
 from yanews import settings
+
+
+@pytest.fixture(autouse=True)
+def enable_db_access_for_all_tests(db):
+    pass
+
+
+@pytest.fixture
+def news_urls(news):
+    return {
+        'home': reverse('news:home'),
+        'detail': reverse('news:detail', args=(news.pk,)),
+    }
+
+
+@pytest.fixture
+def user_urls():
+    return {
+        'login': reverse('users:login'),
+        'logout': reverse('users:logout'),
+        'signup': reverse('users:signup'),
+    }
+
+
+@pytest.fixture
+def expected_redirect_url(user_urls):
+    return f"{user_urls['login']}?next="
+
+
+@pytest.fixture
+def comment_urls(comment):
+    return {
+        'edit': reverse('news:edit', args=(comment.pk,)),
+        'delete': reverse('news:delete', args=(comment.pk,)),
+    }
 
 
 @pytest.fixture
@@ -35,63 +69,41 @@ def not_author_client(not_author):
 
 @pytest.fixture
 def news():
-    news = News.objects.create(
+    return News.objects.create(
         title='Заголовок',
         text='Текст новости',
         date=datetime.today(),
     )
-    return news
 
 
 @pytest.fixture
 def comment(news, author):
-    comment = Comment.objects.create(
+    return Comment.objects.create(
         news=news,
         author=author,
         text='Текст комментария',
     )
-    return comment
 
 
 @pytest.fixture
 def all_news(news):
-    all_news = [
+    return News.objects.bulk_create([
         News(
             title=f'{news.title} {index}',
             text=f'{news.text} {index}',
             date=datetime.today() - timedelta(days=index),
         )
         for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    ]
-    News.objects.bulk_create(all_news)
-    return all_news
+    ])
 
 
 @pytest.fixture
 def all_comments(news, author, comment):
-    all_comments = [
-        Comment(
+    for index in range(settings.NEWS_COUNT_ON_HOME_PAGE):
+        Comment.objects.create(
             news=news,
             author=author,
             text=f'{comment.text} {index}',
             created=timezone.now() - timedelta(days=index),
         )
-        for index in range(settings.NEWS_COUNT_ON_HOME_PAGE)
-    ]
-    Comment.objects.bulk_create(all_comments)
-    return all_comments
-
-
-@pytest.fixture
-def form_comment():
-    return {'text': 'Текст комментария'}
-
-
-@pytest.fixture
-def bad_words_form_comment():
-    return {'text': f'Текст{BAD_WORDS[0]}, комментария'}
-
-
-@pytest.fixture
-def form_update_comment():
-    return {'text': 'Обновленный комментарий'}
+    return Comment.objects.filter(news=news)

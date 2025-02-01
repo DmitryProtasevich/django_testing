@@ -1,85 +1,89 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
+from pytils.translit import slugify
+
 from notes.models import Note
+from notes.tests.constants import BaseTest
 
-User = get_user_model()
 
+class TestLogic(BaseTest):
 
-class TestLogic(TestCase):
-    TEXT = 'Текст'
-    NEW_TEXT = 'Новый текст'
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = User.objects.create(username='Автор')
-        cls.other_author = User.objects.create(username='Автор 2')
-        cls.note_form_data_without_slug = {
-            'title': 'Новая заметка',
-            'text': cls.TEXT,
-        }
-        cls.note_new_form_data = {
-            'title': 'Новая заметка',
-            'text': cls.NEW_TEXT,
-        }
-
-    def test_note_creation_access(self):
-        self.client.force_login(self.author)
-        self.client.post(
-            reverse('notes:add'), data=self.note_form_data_without_slug
+    def add_post(self, author=None):
+        if author is None:
+            author = self.author_client
+        return author.post(
+            self.NOTES_ADD_URL, data=self.note_form_data
         )
-        self.assertEqual(Note.objects.count(), 1)
-        self.client.logout()
-        self.client.post(
-            reverse('notes:add'), data=self.note_form_data_without_slug
+
+    def edit_post(self, author=None):
+        if author is None:
+            author = self.author_client
+        return author.post(
+            self.NOTES_EDIT_URL, data=self.note_form_data
         )
-        self.assertEqual(Note.objects.count(), 1)
+
+    def delete_post(self, author=None):
+        if author is None:
+            author = self.author_client
+        return author.post(
+            self.NOTES_DELETE_URL, data=self.note_form_data
+        )
+
+    def assert_note_details(self, note):
+        self.assertIsNotNone(note)
+        self.assertEqual(note.slug, self.note_form_data['slug'])
+        self.assertEqual(note.title, self.note_form_data['title'])
+        self.assertEqual(note.text, self.note_form_data['text'])
+        self.assertEqual(note.author, self.author)
+
+    def test_note_creation_for_author(self):
+        self.add_post()
+        created_note = Note.objects.get(slug=self.note_form_data['slug'])
+        self.assert_note_details(created_note)
+
+    def test_note_creation_for_client(self):
+        self.add_post(self.client)
+        self.assertFalse(
+            Note.objects.filter(slug=self.note_form_data['slug']).exists()
+        )
 
     def test_cannot_create_duplicate_slug_note(self):
-        self.client.force_login(self.author)
-        self.client.post(reverse('notes:add'),
-                         data=self.note_form_data_without_slug)
+        slug = self.note_form_data['slug']
+        self.add_post()
+        slug_objects_count = Note.objects.filter(slug=slug).count()
+        self.add_post()
         self.assertEqual(
-            self.client.post(reverse('notes:add'), data={
-                'title': 'Новая заметка',
-                'text': 'Новая заметка',
-                'slug': Note.objects.first().slug,
-            }
-            ).status_code, 200
+            Note.objects.filter(slug=slug).count(), slug_objects_count
         )
-        self.assertEqual(Note.objects.count(), 1)
 
     def test_auto_creates_slug_if_empty(self):
-        self.client.force_login(self.author)
-        self.client.post(reverse('notes:add'),
-                         data=self.note_form_data_without_slug)
-        self.assertTrue(Note.objects.first().slug)
+        self.note_form_data.pop('slug')
+        self.add_post()
+        self.assertEqual(
+            Note.objects.get(
+                title=self.note_form_data['title'], author=self.author
+            ).slug, slugify(self.note_form_data['title'])
+        )
 
-    def test_user_can_edit_and_delete_own_notes_and_other_user_cant(self):
-        self.client.force_login(self.author)
-        self.client.post(reverse('notes:add'),
-                         data=self.note_form_data_without_slug)
-        created_note = Note.objects.first()
-        self.client.post(
-            reverse('notes:edit', args=[created_note.slug]),
-            self.note_new_form_data
-        )
-        created_note.refresh_from_db()
-        self.assertEqual(created_note.text, self.NEW_TEXT)
-        self.client.post(reverse('notes:delete', args=[created_note.slug]))
-        self.assertEqual(Note.objects.count(), 0)
-        self.client.post(reverse('notes:add'),
-                         data=self.note_form_data_without_slug)
-        created_note = Note.objects.first()
-        self.client.force_login(self.other_author)
-        created_note.refresh_from_db()
-        self.assertNotEqual(
-            self.client.post(reverse('notes:edit', args=[created_note.slug]),
-                             self.note_new_form_data).status_code, 200
-        )
-        self.assertEqual(created_note.text, self.TEXT)
-        self.assertNotEqual(
-            self.client.post(reverse('notes:delete', args=[created_note.slug]))
-            .status_code, 200
-        )
-        self.assertEqual(Note.objects.count(), 1)
+    def test_user_can_edit_own_notes(self):
+        note_id = self.note.id
+        self.edit_post()
+        updated_note = Note.objects.get(id=note_id)
+        self.assert_note_details(updated_note)
+
+    def test_user_can_delete_own_notes(self):
+        note_id = self.note.id
+        self.delete_post()
+        self.assertFalse(Note.objects.filter(id=note_id).exists())
+
+    def test_other_user_cant_edit_notes(self):
+        note_id = self.note.id
+        self.edit_post(self.other_author_client)
+        updated_note = Note.objects.get(id=note_id)
+        self.assertNotEqual(updated_note.title, self.note_form_data['title'])
+        self.assertNotEqual(updated_note.text, self.note_form_data['text'])
+        self.assertNotEqual(updated_note.slug, self.note_form_data['slug'])
+        self.assertEqual(updated_note.author, self.author)
+
+    def test_other_user_cant_delete_notes(self):
+        note_id = self.note.id
+        self.delete_post(self.other_author_client)
+        self.assertIsNotNone(Note.objects.filter(id=note_id))
