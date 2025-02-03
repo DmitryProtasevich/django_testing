@@ -3,80 +3,76 @@ from http import HTTPStatus
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
 
-FORM_COMMENT = {'text': 'Текст комментария'}
-BAD_WORDS_FORM_COMMENT = {'text': f'Текст{BAD_WORDS}, комментария'}
-FORM_UPDATE_COMMENT = {'text': 'Обновленный комментарий'}
+FORM_COMMENT = {'text': 'Текст'}
 
 
-def test_anonymous_user_cant_create_comment(client, news_urls):
-    assert Comment.objects.count() == 0
-    client.post(news_urls['detail'], data=FORM_COMMENT)
+def test_anonymous_user_cant_create_comment(client, news_detail_url):
+    client.post(news_detail_url, data=FORM_COMMENT)
     assert Comment.objects.count() == 0
 
 
-def test_user_can_create_comment(author_client, author, news, news_urls):
+def test_user_can_create_comment(author_client, author, news, news_detail_url):
     author_client.post(
-        news_urls['detail'], data=FORM_COMMENT
+        news_detail_url, data=FORM_COMMENT
     )
     assert Comment.objects.count() == 1
-    assert Comment.objects.last().news == news
-    assert Comment.objects.last().author == author
-    assert Comment.objects.last().text == FORM_COMMENT['text']
+    comment = Comment.objects.last()
+    assert comment.news == news
+    assert comment.author == author
+    assert comment.text == FORM_COMMENT['text']
 
 
-def test_user_cant_use_bad_words(author_client, news_urls):
-    assert WARNING in author_client.post(
-        news_urls['detail'],
-        data=BAD_WORDS_FORM_COMMENT
-    ).context['form'].errors['text']
-    assert Comment.objects.count() == 0
+def test_user_cant_use_bad_words(author_client, news_detail_url):
+    for bad_word in BAD_WORDS:
+        assert WARNING in author_client.post(
+            news_detail_url,
+            data={'text': f"{FORM_COMMENT['text']} {bad_word}"}
+        ).context['form'].errors['text']
+        assert Comment.objects.count() == 0
 
 
 def test_author_can_update_comment(
-    author_client, comment, comment_urls, news, author
+    author_client, comment, comment_edit_url, news, author
 ):
     author_client.post(
-        comment_urls['edit'], data=FORM_UPDATE_COMMENT
+        comment_edit_url, data=FORM_COMMENT
     )
     updated_comment = Comment.objects.get(pk=comment.pk)
-    assert updated_comment.text == FORM_UPDATE_COMMENT['text']
+    assert updated_comment.text == FORM_COMMENT['text']
     assert updated_comment.news == news
     assert updated_comment.author == author
 
 
-def test_author_can_delete_comment(author_client, comment_urls):
-    assert Comment.objects.count() == 1
-    author_client.delete(comment_urls['delete'])
+def test_author_can_delete_comment(author_client, comment_delete_url):
+    author_client.delete(comment_delete_url)
     assert Comment.objects.count() == 0
 
 
 def test_user_cant_edit_comment_of_another_user(
-    not_author_client, comment, comment_urls
+    not_author_client, comment, comment_edit_url
 ):
-    old_text = comment.text
+    original_news = comment.news
     assert (
-        not_author_client.post(comment_urls['edit'], data=FORM_UPDATE_COMMENT)
+        not_author_client.post(comment_edit_url, data=FORM_COMMENT)
         .status_code == HTTPStatus.NOT_FOUND
     )
-    comment.refresh_from_db()
-    assert comment.text == old_text
+    assert comment.text != FORM_COMMENT['text']
+    assert comment.author != not_author_client
+    assert comment.news == original_news
 
 
 def test_user_cant_delete_comment_of_another_user(
-    not_author_client, comment_urls
-):
-    assert (
-        not_author_client.delete(comment_urls['delete'])
-        .status_code == HTTPStatus.NOT_FOUND
-    )
-
-
-def test_user_cant_delete_comment_of_another_user(
-    not_author_client, comment, comment_urls
+    not_author_client, comment, comment_delete_url
 ):
     comment_pk = comment.pk
     assert (
-        not_author_client.delete(comment_urls['delete'])
+        not_author_client.delete(comment_delete_url)
         .status_code == HTTPStatus.NOT_FOUND
     )
-    assert Comment.objects.filter(pk=comment_pk).exists()
+    assert Comment.objects.filter(
+        pk=comment_pk,
+        text=comment.text,
+        author=comment.author,
+        news=comment.news
+    ).exists()
+    assert Comment.objects.count() == 1

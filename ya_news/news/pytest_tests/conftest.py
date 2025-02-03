@@ -4,6 +4,7 @@ import pytest
 from django.test.client import Client
 from django.urls import reverse
 from django.utils import timezone
+
 from news.models import Comment, News
 from yanews import settings
 
@@ -14,33 +15,48 @@ def enable_db_access_for_all_tests(db):
 
 
 @pytest.fixture
-def news_urls(news):
-    return {
-        'home': reverse('news:home'),
-        'detail': reverse('news:detail', args=(news.pk,)),
-    }
+def news_home_url():
+    return reverse('news:home')
 
 
 @pytest.fixture
-def user_urls():
-    return {
-        'login': reverse('users:login'),
-        'logout': reverse('users:logout'),
-        'signup': reverse('users:signup'),
-    }
+def news_detail_url(news):
+    return reverse('news:detail', args=(news.pk,))
 
 
 @pytest.fixture
-def expected_redirect_url(user_urls):
-    return f"{user_urls['login']}?next="
+def user_login_url():
+    return reverse('users:login')
 
 
 @pytest.fixture
-def comment_urls(comment):
-    return {
-        'edit': reverse('news:edit', args=(comment.pk,)),
-        'delete': reverse('news:delete', args=(comment.pk,)),
-    }
+def user_logout_url():
+    return reverse('users:logout')
+
+
+@pytest.fixture
+def user_signup_url():
+    return reverse('users:signup')
+
+
+@pytest.fixture
+def comment_edit_url(comment):
+    return reverse('news:edit', args=(comment.pk,))
+
+
+@pytest.fixture
+def comment_delete_url(comment):
+    return reverse('news:delete', args=(comment.pk,))
+
+
+@pytest.fixture
+def redirect_edit_url(user_login_url, comment_edit_url):
+    return f"{user_login_url}?next={comment_edit_url}"
+
+
+@pytest.fixture
+def redirect_delete_url(user_login_url, comment_delete_url):
+    return f"{user_login_url}?next={comment_delete_url}"
 
 
 @pytest.fixture
@@ -72,7 +88,6 @@ def news():
     return News.objects.create(
         title='Заголовок',
         text='Текст новости',
-        date=datetime.today(),
     )
 
 
@@ -87,23 +102,27 @@ def comment(news, author):
 
 @pytest.fixture
 def all_news(news):
-    return News.objects.bulk_create([
+    return News.objects.bulk_create(
         News(
             title=f'{news.title} {index}',
             text=f'{news.text} {index}',
             date=datetime.today() - timedelta(days=index),
         )
         for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    ])
+    )
 
 
 @pytest.fixture
 def all_comments(news, author, comment):
-    for index in range(settings.NEWS_COUNT_ON_HOME_PAGE):
-        Comment.objects.create(
+    COMMENTS_QTY = 5
+    all_comments = []
+    for index in range(COMMENTS_QTY):
+        new_comment = Comment.objects.create(
             news=news,
             author=author,
             text=f'{comment.text} {index}',
-            created=timezone.now() - timedelta(days=index),
         )
-    return Comment.objects.filter(news=news)
+        new_comment.created = timezone.now() + timedelta(days=index)
+        new_comment.save()
+        all_comments.append(new_comment)
+    return all_comments
