@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-from notes.tests.utils_for_tests import (
+from ya_note.notes.tests.utils import (
     BaseTest,
     NOTES_EDIT_URL,
     NOTES_DELETE_URL,

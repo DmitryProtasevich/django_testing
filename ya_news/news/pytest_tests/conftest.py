@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 import pytest
 from django.test.client import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from news.models import Comment, News
 from yanews import settings
@@ -51,12 +50,12 @@ def comment_delete_url(comment):
 
 @pytest.fixture
 def redirect_edit_url(user_login_url, comment_edit_url):
-    return f"{user_login_url}?next={comment_edit_url}"
+    return f'{user_login_url}?next={comment_edit_url}'
 
 
 @pytest.fixture
 def redirect_delete_url(user_login_url, comment_delete_url):
-    return f"{user_login_url}?next={comment_delete_url}"
+    return f'{user_login_url}?next={comment_delete_url}'
 
 
 @pytest.fixture
@@ -114,15 +113,12 @@ def all_news(news):
 
 @pytest.fixture
 def all_comments(news, author, comment):
-    COMMENTS_QTY = 5
-    all_comments = []
-    for index in range(COMMENTS_QTY):
-        new_comment = Comment.objects.create(
+    COMMENTS_QUANTITY = 5
+    return [
+        Comment.objects.create(
             news=news,
             author=author,
             text=f'{comment.text} {index}',
         )
-        new_comment.created = timezone.now() + timedelta(days=index)
-        new_comment.save()
-        all_comments.append(new_comment)
-    return all_comments
+        for index in range(COMMENTS_QUANTITY)
+    ]
