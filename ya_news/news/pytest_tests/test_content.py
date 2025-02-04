@@ -18,8 +18,10 @@ def test_sort_date(author_client, news_home_url):
 
 
 def test_sort_comment(author_client, all_comments, news_detail_url):
-    author_client.get(news_detail_url).context['news']
-    all_timestamps = [comment.created for comment in all_comments]
+    comments = (
+        author_client.get(news_detail_url).context['news'].comment_set.all()
+    )
+    all_timestamps = [comment.created for comment in comments]
     assert all_timestamps == sorted(all_timestamps)
 
 

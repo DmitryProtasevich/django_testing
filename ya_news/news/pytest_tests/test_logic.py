@@ -4,9 +4,10 @@ from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
 
 FORM_COMMENT = {'text': 'Текст'}
-BAD_WORDS_FORM_COMMENT = {
-    'text': f"{FORM_COMMENT['text']} {' '.join(BAD_WORDS)}"
-}
+
+
+def create_bad_word_comment_data(bad_word):
+    return {'text': f"{FORM_COMMENT['text']} {bad_word}"}
 
 
 def test_anonymous_user_cant_create_comment(client, news_detail_url):
@@ -26,11 +27,12 @@ def test_user_can_create_comment(author_client, author, news, news_detail_url):
 
 
 def test_user_cant_use_bad_words(author_client, news_detail_url):
-    assert WARNING in author_client.post(
-        news_detail_url,
-        data=BAD_WORDS_FORM_COMMENT
-    ).context['form'].errors['text']
-    assert Comment.objects.count() == 0
+    for bad_word in BAD_WORDS:
+        assert WARNING in author_client.post(
+            news_detail_url,
+            data=create_bad_word_comment_data(bad_word)
+        ).context['form'].errors['text']
+        assert Comment.objects.count() == 0
 
 
 def test_author_can_update_comment(
@@ -70,6 +72,7 @@ def test_user_cant_delete_comment_of_another_user(
         not_author_client.delete(comment_delete_url)
         .status_code == HTTPStatus.NOT_FOUND
     )
+    assert Comment.objects.filter(pk=comment.pk).exists()
     expected_comment = Comment.objects.get(pk=comment.pk)
     assert expected_comment.text == comment.text
     assert expected_comment.author == comment.author

@@ -36,7 +36,7 @@ class BaseTest(TestCase):
             slug=SLUG_OF_NOTE,
             author=cls.author,
         )
-        cls.note_form_data = {
+        cls.form_data = {
             'title': 'Новая заметка',
             'text': 'Текст формы',
             'slug': 'slug'

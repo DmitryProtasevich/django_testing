@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 from django.test.client import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from news.models import Comment, News
 from yanews import settings
@@ -114,11 +115,11 @@ def all_news(news):
 @pytest.fixture
 def all_comments(news, author, comment):
     COMMENTS_QUANTITY = 5
-    return [
-        Comment.objects.create(
+    for index in range(COMMENTS_QUANTITY):
+        new_comment = Comment.objects.create(
             news=news,
             author=author,
             text=f'{comment.text} {index}',
         )
-        for index in range(COMMENTS_QUANTITY)
-    ]
+        new_comment.created = timezone.now() + timedelta(days=index)
+        new_comment.save()
