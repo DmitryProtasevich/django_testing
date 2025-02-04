@@ -51,7 +51,7 @@ def test_author_can_delete_comment(author_client, comment_delete_url):
 
 
 def test_user_cant_edit_comment_of_another_user(
-    not_author_client, comment, comment_edit_url,
+    not_author_client, comment, comment_edit_url
 ):
     assert (
         not_author_client.post(comment_edit_url, data=FORM_COMMENT)
