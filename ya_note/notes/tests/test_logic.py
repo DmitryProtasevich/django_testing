@@ -5,7 +5,7 @@ from pytils.translit import slugify
 
 from notes.forms import WARNING
 from notes.models import Note
-from ya_note.notes.tests.utils import (
+from notes.tests.utils import (
     BaseTest,
     NOTES_EDIT_URL,
     NOTES_DELETE_URL,

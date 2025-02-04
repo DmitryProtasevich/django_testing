@@ -1,5 +1,5 @@
 from notes.forms import NoteForm
-from ya_note.notes.tests.utils import (
+from notes.tests.utils import (
     BaseTest,
     NOTES_ADD_URL,
     NOTES_LIST_URL,
