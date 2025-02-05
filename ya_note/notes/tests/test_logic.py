@@ -88,10 +88,10 @@ class TestLogic(BaseTest):
         self.assertEqual(note.author, self.note.author)
 
     def test_other_user_cant_delete_notes(self):
-        self.assertTrue(Note.objects.filter(id=self.note.id).exists())
         self.assertEqual(self.other_author_client.post(
             NOTES_DELETE_URL, data=self.form_data
         ).status_code, HTTPStatus.NOT_FOUND)
+        self.assertTrue(Note.objects.filter(id=self.note.id).exists())
         note = Note.objects.get(id=self.note.id)
         self.assertEqual(note.title, self.note.title)
         self.assertEqual(note.text, self.note.text)

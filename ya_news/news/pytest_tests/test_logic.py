@@ -1,5 +1,7 @@
 from http import HTTPStatus
 
+import pytest
+
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
 
@@ -26,13 +28,13 @@ def test_user_can_create_comment(author_client, author, news, news_detail_url):
     assert comment.text == FORM_COMMENT['text']
 
 
-def test_user_cant_use_bad_words(author_client, news_detail_url):
-    for bad_word in BAD_WORDS:
-        assert WARNING in author_client.post(
-            news_detail_url,
-            data=create_bad_word_comment_data(bad_word)
-        ).context['form'].errors['text']
-        assert Comment.objects.count() == 0
+@pytest.mark.parametrize('bad_word', [(BAD_WORDS)])
+def test_user_cant_use_bad_words(author_client, news_detail_url, bad_word):
+    assert WARNING in author_client.post(
+        news_detail_url,
+        data=create_bad_word_comment_data(bad_word)
+    ).context['form'].errors['text']
+    assert Comment.objects.count() == 0
 
 
 def test_author_can_update_comment(
